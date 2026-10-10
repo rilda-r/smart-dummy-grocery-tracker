@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "269439241528",
+    "project_id": "smart-dummy-grocery-tracker",
+    "storage_bucket": "smart-dummy-grocery-tracker.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:269439241528:android:854c2ca0f8292e9bcdc5cd",
+        "android_client_info": {
+          "package_name": "com.grocease.grocease"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBHSDBnpO9N378SjZVi5RSHC3y5NSG4BZU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

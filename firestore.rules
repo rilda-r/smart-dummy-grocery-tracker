@@ -1,0 +1,108 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isGroupMember(groupId) {
+      return isAuthenticated() && (
+        request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds
+      );
+    }
+    
+    function isGroupOwner(groupId) {
+      return isAuthenticated() && (
+        request.auth.uid == get(/databases/$(database)/documents/groups/$(groupId)).data.ownerId
+      );
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(userId)
+        && request.resource.data.keys().hasAll(['displayName', 'email'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() >= 2
+        && request.resource.data.displayName.size() <= 80
+        && request.resource.data.email is string;
+      allow delete: if false; // Deletion executed exclusively via Cloud Function
+    }
+
+    // Groups Collection
+    match /groups/{groupId} {
+      // Allow read if user is member OR checking valid join code query
+      allow read: if isAuthenticated() && (
+        (resource != null && request.auth.uid in resource.data.memberIds) ||
+        (resource != null && resource.data.joinCode == request.query.joinCode)
+      );
+      
+      allow create: if isAuthenticated()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.memberIds.hasOnly([request.auth.uid])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 100
+        && request.resource.data.joinCode is string
+        && request.resource.data.joinCode.size() == 6;
+
+      allow update: if isAuthenticated() && (
+        // Existing member updating regular metadata
+        (isGroupMember(groupId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['ownerId', 'joinCode'])) ||
+        // Only owner can update ownerId or regenerate joinCode or modify member roles directly
+        isGroupOwner(groupId) ||
+        // Allow a new member to add themselves to memberIds via join code match
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds', 'updatedAt']) &&
+          request.resource.data.memberIds.hasAll(resource.data.memberIds) &&
+          request.resource.data.memberIds.size() == resource.data.memberIds.size() + 1 &&
+          request.auth.uid in request.resource.data.memberIds
+        )
+      );
+
+      allow delete: if isGroupOwner(groupId);
+
+      // Members subcollection
+      match /members/{memberId} {
+        allow read: if isGroupMember(groupId);
+        allow create: if isAuthenticated() && request.auth.uid == memberId;
+        allow update, delete: if isGroupOwner(groupId) || (isAuthenticated() && request.auth.uid == memberId);
+      }
+
+      // Lists subcollection
+      match /lists/{listId} {
+        allow read, write: if isGroupMember(groupId);
+
+        // Items subcollection
+        match /items/{itemId} {
+          allow read, write: if isGroupMember(groupId);
+        }
+      }
+
+      // Expenses subcollection
+      match /expenses/{expenseId} {
+        allow read, create: if isGroupMember(groupId);
+        allow update, delete: if isGroupMember(groupId) && (
+          resource.data.paidBy == request.auth.uid || isGroupOwner(groupId)
+        );
+      }
+
+      // Activity subcollection (audit log is append-only)
+      match /activity/{activityId} {
+        allow read: if isGroupMember(groupId);
+        allow create: if isGroupMember(groupId);
+        allow update, delete: if false;
+      }
+    }
+
+    // AuthState collection (Server-only failed attempt lockout tracking)
+    match /authState/{emailHash} {
+      allow read, write: if false; // Deny all direct client access
+    }
+  }
+}
