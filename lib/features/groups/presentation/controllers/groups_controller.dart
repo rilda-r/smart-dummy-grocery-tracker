@@ -4,6 +4,8 @@ import '../../data/repositories/groups_repository.dart';
 import '../../domain/models/group.dart';
 import '../../domain/models/group_member.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 /// Stream of all groups the current user belongs to
 final userGroupsProvider = StreamProvider<List<Group>>((ref) {
   final user = ref.watch(currentUserProvider);
@@ -12,15 +14,64 @@ final userGroupsProvider = StreamProvider<List<Group>>((ref) {
   return repo.watchUserGroups(user.uid);
 });
 
-/// Currently active group ID in the app
-final activeGroupIdProvider = StateProvider<String?>((ref) {
-  // If not explicitly selected, default to first available group
-  final groupsAsync = ref.watch(userGroupsProvider);
-  return groupsAsync.when(
-    data: (groups) => groups.isNotEmpty ? groups.first.id : null,
-    loading: () => null,
-    error: (_, __) => null,
-  );
+/// Active group ID notifier with SharedPreferences persistence across app restarts
+class ActiveGroupIdNotifier extends StateNotifier<String?> {
+  ActiveGroupIdNotifier(this._ref) : super(null) {
+    _init();
+  }
+
+  final Ref _ref;
+  static const _prefKey = 'active_group_id';
+
+  Future<void> _init() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedId = prefs.getString(_prefKey);
+      if (savedId != null && state == null) {
+        state = savedId;
+      }
+    } catch (_) {}
+
+    _ref.listen<AsyncValue<List<Group>>>(userGroupsProvider, (previous, next) {
+      next.whenData((groups) {
+        if (groups.isEmpty) {
+          state = null;
+        } else {
+          final exists = groups.any((g) => g.id == state);
+          if (!exists) {
+            SharedPreferences.getInstance().then((prefs) {
+              final savedId = prefs.getString(_prefKey);
+              if (savedId != null && groups.any((g) => g.id == savedId)) {
+                state = savedId;
+              } else {
+                state = groups.first.id;
+                prefs.setString(_prefKey, groups.first.id);
+              }
+            }).catchError((_) {
+              state = groups.first.id;
+            });
+          }
+        }
+      });
+    }, fireImmediately: true);
+  }
+
+  Future<void> setActiveGroup(String? groupId) async {
+    state = groupId;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (groupId != null) {
+        await prefs.setString(_prefKey, groupId);
+      } else {
+        await prefs.remove(_prefKey);
+      }
+    } catch (_) {}
+  }
+}
+
+final activeGroupIdProvider =
+    StateNotifierProvider<ActiveGroupIdNotifier, String?>((ref) {
+  return ActiveGroupIdNotifier(ref);
 });
 
 /// Currently active group object
@@ -85,7 +136,7 @@ class GroupsController extends StateNotifier<AsyncValue<void>> {
         user: user,
       );
       // Automatically switch to the newly created group
-      _ref.read(activeGroupIdProvider.notifier).state = group.id;
+      await _ref.read(activeGroupIdProvider.notifier).setActiveGroup(group.id);
       state = const AsyncValue.data(null);
       return group;
     } catch (e, st) {
@@ -109,7 +160,7 @@ class GroupsController extends StateNotifier<AsyncValue<void>> {
         user: user,
       );
       // Automatically switch to joined group
-      _ref.read(activeGroupIdProvider.notifier).state = group.id;
+      await _ref.read(activeGroupIdProvider.notifier).setActiveGroup(group.id);
       state = const AsyncValue.data(null);
       return group;
     } catch (e, st) {
@@ -146,7 +197,7 @@ class GroupsController extends StateNotifier<AsyncValue<void>> {
         userId: user.uid,
       );
       if (_ref.read(activeGroupIdProvider) == groupId) {
-        _ref.read(activeGroupIdProvider.notifier).state = null;
+        await _ref.read(activeGroupIdProvider.notifier).setActiveGroup(null);
       }
       state = const AsyncValue.data(null);
     } catch (e, st) {

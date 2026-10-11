@@ -9,6 +9,7 @@ import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../domain/models/group.dart';
 import '../controllers/groups_controller.dart';
+import '../../../notifications/presentation/widgets/notification_bell_icon.dart';
 
 class GroupsScreen extends ConsumerStatefulWidget {
   const GroupsScreen({super.key});
@@ -38,6 +39,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
             icon: const Icon(Icons.add_circle_outline),
             onPressed: () => _showCreateGroupSheet(context),
           ),
+          const NotificationBellIcon(),
         ],
       ),
       body: SafeArea(
@@ -309,7 +311,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                 )
               : OutlinedButton(
                   onPressed: () {
-                    ref.read(activeGroupIdProvider.notifier).state = group.id;
+                    ref.read(activeGroupIdProvider.notifier).setActiveGroup(group.id);
                   },
                   child: const Text('Switch'),
                 ),

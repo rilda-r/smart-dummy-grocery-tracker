@@ -9,6 +9,7 @@ import '../../../auth/data/auth_repository.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../expenses/presentation/screens/budget_analytics_screen.dart';
 import '../../../expenses/presentation/screens/personal_expenses_screen.dart';
+import '../../../notifications/presentation/widgets/notification_bell_icon.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -21,6 +22,7 @@ class ProfileScreen extends ConsumerWidget {
       backgroundColor: AppColors.paper,
       appBar: AppBar(
         title: const Text('Profile & Settings'),
+        actions: const [NotificationBellIcon()],
       ),
       body: SafeArea(
         child: SingleChildScrollView(

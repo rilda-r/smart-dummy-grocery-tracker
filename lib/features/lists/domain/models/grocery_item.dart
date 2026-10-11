@@ -37,6 +37,23 @@ extension GroceryStatusExt on GroceryStatus {
   }
 }
 
+enum FreshnessStatus { fresh, soon, expired, none }
+
+extension FreshnessStatusExt on FreshnessStatus {
+  String get label {
+    switch (this) {
+      case FreshnessStatus.fresh:
+        return 'Fresh';
+      case FreshnessStatus.soon:
+        return 'Expiring Soon';
+      case FreshnessStatus.expired:
+        return 'Expired';
+      case FreshnessStatus.none:
+        return '';
+    }
+  }
+}
+
 class GroceryItem {
   const GroceryItem({
     required this.id,
@@ -51,6 +68,8 @@ class GroceryItem {
     this.purchasedQuantity = 0,
     this.lockedBy,
     this.lockedAt,
+    this.expiryDate,
+    this.category,
   });
 
   final String id;
@@ -65,6 +84,8 @@ class GroceryItem {
   final DateTime updatedAt;
   final String? lockedBy; // uid of member who locked this item for purchase
   final DateTime? lockedAt;
+  final DateTime? expiryDate;
+  final String? category;
 
   bool get isLocked => lockedBy != null && lockedAt != null;
 
@@ -73,6 +94,24 @@ class GroceryItem {
     if (lockedAt == null) return false;
     return now.difference(lockedAt!).inMinutes >= 10;
   }
+
+  int? get daysUntilExpiry {
+    if (expiryDate == null) return null;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(expiryDate!.year, expiryDate!.month, expiryDate!.day);
+    return target.difference(today).inDays;
+  }
+
+  FreshnessStatus get freshness {
+    final days = daysUntilExpiry;
+    if (days == null) return FreshnessStatus.none;
+    if (days < 0) return FreshnessStatus.expired;
+    if (days <= 3) return FreshnessStatus.soon;
+    return FreshnessStatus.fresh;
+  }
+
+  bool get isLowStock => quantity <= 1;
 
   factory GroceryItem.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
@@ -89,6 +128,8 @@ class GroceryItem {
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       lockedBy: data['lockedBy'] as String?,
       lockedAt: (data['lockedAt'] as Timestamp?)?.toDate(),
+      expiryDate: (data['expiryDate'] as Timestamp?)?.toDate(),
+      category: data['category'] as String?,
     );
   }
 
@@ -105,6 +146,8 @@ class GroceryItem {
       'updatedAt': Timestamp.fromDate(updatedAt),
       'lockedBy': lockedBy,
       'lockedAt': lockedAt != null ? Timestamp.fromDate(lockedAt!) : null,
+      'expiryDate': expiryDate != null ? Timestamp.fromDate(expiryDate!) : null,
+      'category': category,
     };
   }
 
@@ -122,6 +165,9 @@ class GroceryItem {
     String? lockedBy,
     DateTime? lockedAt,
     bool clearLock = false,
+    DateTime? expiryDate,
+    bool clearExpiry = false,
+    String? category,
   }) {
     return GroceryItem(
       id: id ?? this.id,
@@ -136,6 +182,8 @@ class GroceryItem {
       updatedAt: updatedAt ?? this.updatedAt,
       lockedBy: clearLock ? null : (lockedBy ?? this.lockedBy),
       lockedAt: clearLock ? null : (lockedAt ?? this.lockedAt),
+      expiryDate: clearExpiry ? null : (expiryDate ?? this.expiryDate),
+      category: category ?? this.category,
     );
   }
 }

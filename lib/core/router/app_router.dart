@@ -13,6 +13,10 @@ import '../../features/home/presentation/screens/app_shell.dart';
 import '../../features/home/presentation/screens/home_dashboard_screen.dart';
 import '../../features/lists/presentation/screens/lists_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
+import '../../features/notifications/presentation/screens/notifications_screen.dart';
+import '../../features/expenses/presentation/screens/budget_analytics_screen.dart';
+import '../../features/expenses/presentation/screens/personal_expenses_screen.dart';
+import '../../features/lists/presentation/screens/shopping_session_screen.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
@@ -78,6 +82,26 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/forgot-password',
         builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/notifications',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/budget-analytics',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const BudgetAnalyticsScreen(),
+      ),
+      GoRoute(
+        path: '/personal-expenses',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const PersonalExpensesScreen(),
+      ),
+      GoRoute(
+        path: '/shopping',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const ShoppingSessionScreen(),
       ),
 
       // App Shell with Bottom Tabs

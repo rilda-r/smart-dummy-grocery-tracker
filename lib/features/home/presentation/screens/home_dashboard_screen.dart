@@ -13,6 +13,8 @@ import '../../../groups/presentation/controllers/groups_controller.dart';
 import '../../../lists/domain/models/grocery_item.dart';
 import '../../../lists/presentation/controllers/grocery_controller.dart';
 import '../../../lists/presentation/screens/shopping_session_screen.dart';
+import '../../../groups/presentation/widgets/room_switcher_title.dart';
+import '../../../notifications/presentation/widgets/notification_bell_icon.dart';
 
 class HomeDashboardScreen extends ConsumerWidget {
   const HomeDashboardScreen({super.key});
@@ -28,10 +30,7 @@ class HomeDashboardScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.paper,
       appBar: AppBar(
-        title: Text(
-          'GrocEase',
-          style: AppTypography.displayMedium.copyWith(color: AppColors.forest),
-        ),
+        title: const RoomSwitcherAppBarTitle(fallbackTitle: 'GrocEase'),
         actions: [
           IconButton(
             icon: const Icon(Icons.analytics_outlined),
@@ -44,6 +43,7 @@ class HomeDashboardScreen extends ConsumerWidget {
               );
             },
           ),
+          const NotificationBellIcon(),
         ],
       ),
       body: SafeArea(

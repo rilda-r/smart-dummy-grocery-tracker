@@ -9,6 +9,12 @@ import 'package:grocease/features/groups/domain/models/invite_code.dart';
 import 'package:grocease/features/groups/presentation/controllers/groups_controller.dart';
 import 'package:grocease/features/groups/presentation/screens/groups_screen.dart';
 
+class _TestActiveGroupIdNotifier extends ActiveGroupIdNotifier {
+  _TestActiveGroupIdNotifier(super.ref, String initialId) {
+    state = initialId;
+  }
+}
+
 void main() {
   setUpAll(() {
     AppTypography.isTest = true;
@@ -119,7 +125,7 @@ void main() {
         ProviderScope(
           overrides: [
             userGroupsProvider.overrideWith((ref) => Stream.value([testGroup])),
-            activeGroupIdProvider.overrideWith((ref) => testGroup.id),
+            activeGroupIdProvider.overrideWith((ref) => _TestActiveGroupIdNotifier(ref, testGroup.id)),
             groupMembersProvider(testGroup.id).overrideWith((ref) => Stream.value([testMember])),
           ],
           child: const MaterialApp(

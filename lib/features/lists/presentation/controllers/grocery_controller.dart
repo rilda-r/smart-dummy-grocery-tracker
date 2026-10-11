@@ -23,9 +23,13 @@ class GroceryController extends StateNotifier<AsyncValue<void>> {
 
   final Ref _ref;
 
-  Future<bool> addItem({required String itemName, required int quantity}) async {
+  Future<bool> addItem({
+    required String itemName,
+    required int quantity,
+    String? targetGroupId,
+  }) async {
     final user = _ref.read(currentUserProvider);
-    final groupId = _ref.read(activeGroupIdProvider);
+    final groupId = targetGroupId ?? _ref.read(activeGroupIdProvider);
     if (user == null || groupId == null) {
       state = AsyncValue.error('Not authenticated or no group selected.', StackTrace.current);
       return false;

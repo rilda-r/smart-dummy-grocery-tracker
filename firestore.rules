@@ -132,6 +132,10 @@ service cloud.firestore {
       allow read, write: if isOwner(userId);
     }
 
+    match /users/{userId}/notifications/{notifId} {
+      allow read, write: if isOwner(userId);
+    }
+
     // AuthState collection (Server-only failed attempt lockout tracking)
     match /authState/{emailHash} {
       allow read, write: if false; // Deny all direct client access

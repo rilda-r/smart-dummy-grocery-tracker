@@ -13,6 +13,8 @@ import '../../data/repositories/grocery_repository.dart';
 import '../../domain/models/grocery_item.dart';
 import '../controllers/grocery_controller.dart';
 import 'shopping_session_screen.dart';
+import '../../../groups/presentation/widgets/room_switcher_title.dart';
+import '../../../notifications/presentation/widgets/notification_bell_icon.dart';
 
 class ListsScreen extends ConsumerStatefulWidget {
   const ListsScreen({super.key});
@@ -85,16 +87,7 @@ class _ListsScreenState extends ConsumerState<ListsScreen>
     return Scaffold(
       backgroundColor: AppColors.paper,
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Grocery List'),
-            Text(
-              activeGroup.name,
-              style: AppTypography.bodySmall.copyWith(color: AppColors.moss),
-            ),
-          ],
-        ),
+        title: const RoomSwitcherAppBarTitle(fallbackTitle: 'Grocery List'),
         actions: [
           if (controllerState.isLoading)
             const Padding(
@@ -110,6 +103,7 @@ class _ListsScreenState extends ConsumerState<ListsScreen>
             tooltip: 'Add item',
             onPressed: () => _showAddItemSheet(context),
           ),
+          const NotificationBellIcon(),
         ],
         bottom: TabBar(
           controller: _tabController,
@@ -462,15 +456,17 @@ class _AddItemSheetState extends ConsumerState<_AddItemSheet> {
   bool _loading = false;
   List<String> _suggestions = [];
   bool _suggestionsLoaded = false;
+  String? _selectedGroupId;
 
   @override
   void initState() {
     super.initState();
+    _selectedGroupId = ref.read(activeGroupIdProvider);
     _loadSuggestions();
   }
 
   Future<void> _loadSuggestions() async {
-    final groupId = ref.read(activeGroupIdProvider);
+    final groupId = _selectedGroupId ?? ref.read(activeGroupIdProvider);
     if (groupId == null) return;
     final suggestions =
         await ref.read(groceryRepositoryProvider).getSuggestions(groupId);
@@ -493,18 +489,32 @@ class _AddItemSheetState extends ConsumerState<_AddItemSheet> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
     final qty = int.tryParse(_qtyCtrl.text.trim()) ?? 1;
+    final targetId = _selectedGroupId ?? ref.read(activeGroupIdProvider);
     final ok = await ref
         .read(groceryControllerProvider.notifier)
-        .addItem(itemName: _nameCtrl.text.trim(), quantity: qty);
+        .addItem(
+          itemName: _nameCtrl.text.trim(),
+          quantity: qty,
+          targetGroupId: targetId,
+        );
     if (mounted) {
       setState(() => _loading = false);
-      if (ok) Navigator.of(context).pop();
+      if (ok) {
+        if (targetId != null && targetId != ref.read(activeGroupIdProvider)) {
+          await ref.read(activeGroupIdProvider.notifier).setActiveGroup(targetId);
+        }
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final userGroups = ref.watch(userGroupsProvider).valueOrNull ?? [];
+
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
       decoration: const BoxDecoration(
@@ -530,7 +540,37 @@ class _AddItemSheetState extends ConsumerState<_AddItemSheet> {
             ),
             const SizedBox(height: 16),
             Text('Add Item', style: AppTypography.titleLarge),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
+
+            // Room Selector
+            if (userGroups.isNotEmpty) ...[
+              DropdownButtonFormField<String>(
+                initialValue: _selectedGroupId != null && userGroups.any((g) => g.id == _selectedGroupId)
+                    ? _selectedGroupId
+                    : userGroups.first.id,
+                decoration: const InputDecoration(
+                  labelText: 'Target Room',
+                  prefixIcon: Icon(Icons.meeting_room_outlined, color: AppColors.forest, size: 20),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                items: userGroups
+                    .map((g) => DropdownMenuItem(
+                          value: g.id,
+                          child: Text(g.name),
+                        ))
+                    .toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() {
+                      _selectedGroupId = val;
+                      _suggestionsLoaded = false;
+                    });
+                    _loadSuggestions();
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
 
             // Item name
             AppTextField(

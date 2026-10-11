@@ -10,6 +10,8 @@ import '../../data/services/expense_split_calculator.dart';
 import '../../domain/models/bill.dart';
 import '../../domain/models/payment.dart';
 
+import '../../data/services/receipt_preprocessor.dart';
+
 final billsStreamProvider = StreamProvider<List<Bill>>((ref) {
   final activeGroupId = ref.watch(activeGroupIdProvider);
   if (activeGroupId == null) return Stream.value([]);
@@ -42,32 +44,70 @@ class ExpensesController extends StateNotifier<AsyncValue<void>> {
   final Ref _ref;
   ExpensesRepository get _repo => _ref.read(expensesRepositoryProvider);
 
-  /// Process an uploaded bill image via on-device ML Kit OCR
-  Future<Bill?> processBillImage({
-    required XFile file,
+  /// Process an uploaded bill image or PDF via on-device ML Kit OCR
+  Future<Bill?> processBillFile({
+    required String filePath,
+    required String fileName,
     required String groupId,
     required String uploadedBy,
   }) async {
     state = const AsyncLoading();
     try {
-      String extractedText = '';
+      final parsedItems = <ParsedBillLine>[];
+      double? detectedGrandTotal;
+
+      final isPdf = ReceiptPreprocessor.isPdf(fileName);
 
       if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+        final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
         try {
-          final textRecognizer =
-              TextRecognizer(script: TextRecognitionScript.latin);
-          final inputImage = InputImage.fromFilePath(file.path);
-          final recognizedText = await textRecognizer.processImage(inputImage);
-          extractedText = recognizedText.text;
-          await textRecognizer.close();
+          if (isPdf) {
+            final pageBytesList = await ReceiptPreprocessor.renderPdfPages(filePath);
+            for (int i = 0; i < pageBytesList.length; i++) {
+              final tempFile = File('${Directory.systemTemp.path}/ocr_page_$i.jpg');
+              await tempFile.writeAsBytes(pageBytesList[i]);
+
+              final inputImage = InputImage.fromFilePath(tempFile.path);
+              final recognized = await textRecognizer.processImage(inputImage);
+              final rows = BillOcrParser.rebuildRowsFromMlKit(recognized);
+              final pageResult = BillOcrParser.parseText(recognized.text, prebuiltRows: rows);
+
+              parsedItems.addAll(pageResult.items);
+              if (pageResult.detectedGrandTotal != null) {
+                detectedGrandTotal = pageResult.detectedGrandTotal;
+              }
+
+              if (await tempFile.exists()) {
+                await tempFile.delete();
+              }
+            }
+          } else {
+            // Preprocess image
+            final rawBytes = await File(filePath).readAsBytes();
+            final preprocessed = ReceiptPreprocessor.preprocessImageBytes(rawBytes);
+            final tempFile = File('${Directory.systemTemp.path}/ocr_temp.jpg');
+            await tempFile.writeAsBytes(preprocessed);
+
+            final inputImage = InputImage.fromFilePath(tempFile.path);
+            final recognized = await textRecognizer.processImage(inputImage);
+            final rows = BillOcrParser.rebuildRowsFromMlKit(recognized);
+            final result = BillOcrParser.parseText(recognized.text, prebuiltRows: rows);
+
+            parsedItems.addAll(result.items);
+            detectedGrandTotal = result.detectedGrandTotal;
+
+            if (await tempFile.exists()) {
+              await tempFile.delete();
+            }
+          }
         } catch (e) {
-          debugPrint('ML Kit recognition fallback: $e');
+          debugPrint('ML Kit recognition notice: $e');
+        } finally {
+          await textRecognizer.close();
         }
       }
 
-      final parsedLines = BillOcrParser.parseText(extractedText);
-
-      final items = parsedLines.map((line) {
+      final items = parsedItems.map((line) {
         return BillItem(
           id: '',
           billId: '',
@@ -78,15 +118,17 @@ class ExpensesController extends StateNotifier<AsyncValue<void>> {
         );
       }).toList();
 
-      final total = items.fold<double>(
-          0.0, (sum, i) => sum + i.totalPrice);
+      final computedSum = items.fold<double>(0.0, (sum, i) => sum + i.totalPrice);
+      final finalTotal = detectedGrandTotal != null && detectedGrandTotal > 0
+          ? detectedGrandTotal
+          : ((computedSum * 100).round() / 100);
 
       final bill = await _repo.createBillWithItems(
         groupId: groupId,
         uploadedBy: uploadedBy,
-        fileName: file.name,
+        fileName: fileName,
         items: items,
-        totalAmount: (total * 100).round() / 100,
+        totalAmount: finalTotal,
       );
 
       state = const AsyncData(null);
@@ -96,6 +138,19 @@ class ExpensesController extends StateNotifier<AsyncValue<void>> {
       return null;
     }
   }
+
+  /// Convenience wrapper for XFile
+  Future<Bill?> processBillImage({
+    required XFile file,
+    required String groupId,
+    required String uploadedBy,
+  }) =>
+      processBillFile(
+        filePath: file.path,
+        fileName: file.name,
+        groupId: groupId,
+        uploadedBy: uploadedBy,
+      );
 
   /// Create a bill manually without OCR
   Future<Bill?> createManualBill({

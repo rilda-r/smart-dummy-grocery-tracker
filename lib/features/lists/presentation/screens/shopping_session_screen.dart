@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../shared/widgets/app_button.dart';
@@ -45,6 +46,19 @@ class _ShoppingSessionScreenState
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
+          TextButton.icon(
+            icon: const Icon(Icons.receipt_long_outlined, size: 16, color: AppColors.forest),
+            label: Text(
+              'Spend',
+              style: AppTypography.labelLarge.copyWith(color: AppColors.forest),
+            ),
+            onPressed: () {
+              final items = itemsAsync.valueOrNull ?? [];
+              final purchased = items.where((i) => i.status == GroceryStatus.purchased).toList();
+              Navigator.of(context).pop();
+              context.go('/expenses?upload=true', extra: purchased);
+            },
+          ),
           TextButton(
             onPressed: () => setState(() => _showSummary = true),
             child: Text(
@@ -332,14 +346,26 @@ class _ShoppingSummary extends StatelessWidget {
         ),
 
         const SizedBox(height: 24),
+        AppButton(
+          text: 'Upload Bill & Split in Spend',
+          variant: AppButtonVariant.primary,
+          icon: const Icon(Icons.receipt_long, color: Colors.white, size: 18),
+          onPressed: () {
+            Navigator.of(context).pop();
+            context.go('/expenses?upload=true', extra: purchased);
+          },
+        ),
+        const SizedBox(height: 12),
         if (pending.isNotEmpty)
           AppButton(
             text: 'Continue Shopping',
+            variant: AppButtonVariant.secondary,
             onPressed: onContinue,
           )
         else
           AppButton(
             text: 'Done — Close',
+            variant: AppButtonVariant.secondary,
             onPressed: () => Navigator.of(context).pop(),
           ),
       ],

@@ -12,6 +12,8 @@ import '../../domain/models/bill.dart';
 import '../../domain/models/payment.dart';
 import '../controllers/expenses_controller.dart';
 import 'bill_detail_screen.dart';
+import '../../../groups/presentation/widgets/room_switcher_title.dart';
+import '../../../notifications/presentation/widgets/notification_bell_icon.dart';
 
 class ExpensesScreen extends ConsumerStatefulWidget {
   const ExpensesScreen({super.key});
@@ -62,16 +64,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen>
     return Scaffold(
       backgroundColor: AppColors.paper,
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Spend & Balances'),
-            Text(
-              activeGroup.name,
-              style: AppTypography.bodySmall.copyWith(color: AppColors.forest),
-            ),
-          ],
-        ),
+        title: const RoomSwitcherAppBarTitle(fallbackTitle: 'Spend & Balances'),
         actions: [
           IconButton(
             icon: const Icon(Icons.document_scanner_outlined),
@@ -83,6 +76,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen>
             tooltip: 'Upload Receipt from Gallery',
             onPressed: () => _pickAndScanReceipt(context, ImageSource.gallery),
           ),
+          const NotificationBellIcon(),
         ],
         bottom: TabBar(
           controller: _tabController,
