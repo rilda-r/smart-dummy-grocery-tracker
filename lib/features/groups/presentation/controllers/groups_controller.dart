@@ -48,6 +48,13 @@ final groupMembersProvider = StreamProvider.family<List<GroupMember>, String>((r
   return repo.watchGroupMembers(groupId);
 });
 
+/// Members of currently active group
+final activeGroupMembersProvider = Provider<AsyncValue<List<GroupMember>>>((ref) {
+  final activeId = ref.watch(activeGroupIdProvider);
+  if (activeId == null) return const AsyncValue.data([]);
+  return ref.watch(groupMembersProvider(activeId));
+});
+
 /// Controller handling user actions (create, join, leave group)
 final groupsControllerProvider =
     StateNotifierProvider<GroupsController, AsyncValue<void>>((ref) {

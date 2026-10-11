@@ -109,6 +109,17 @@ class AuthRepository {
     }
   }
 
+  Future<void> updateDisplayName(String name) async {
+    final user = auth.currentUser;
+    if (user != null) {
+      await user.updateDisplayName(name.trim());
+      await firestore.collection('users').doc(user.uid).update({
+        'displayName': name.trim(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
   Future<void> signOut() async {
     await auth.signOut();
   }

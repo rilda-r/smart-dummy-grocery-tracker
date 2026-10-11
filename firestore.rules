@@ -92,12 +92,44 @@ service cloud.firestore {
         );
       }
 
+      // Grocery items subcollection
+      match /groceryItems/{itemId} {
+        allow read, write: if isGroupMember(groupId);
+      }
+
+      // Bills subcollection & line items
+      match /bills/{billId} {
+        allow read, write: if isGroupMember(groupId);
+
+        match /billItems/{itemId} {
+          allow read, write: if isGroupMember(groupId);
+        }
+      }
+
+      // Payments subcollection
+      match /payments/{paymentId} {
+        allow read, write: if isGroupMember(groupId);
+      }
+
       // Activity subcollection (audit log is append-only)
       match /activity/{activityId} {
         allow read: if isGroupMember(groupId);
         allow create: if isGroupMember(groupId);
         allow update, delete: if false;
       }
+    }
+
+    // User private collections (personal expenses, budgets, history)
+    match /users/{userId}/personalExpenses/{expenseId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /users/{userId}/budgets/{budgetId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /users/{userId}/budgetHistory/{historyId} {
+      allow read, write: if isOwner(userId);
     }
 
     // AuthState collection (Server-only failed attempt lockout tracking)
